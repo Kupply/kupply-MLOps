@@ -1,39 +1,53 @@
-# 텍스트를 딥러닝 모델에 넣어 분류하기 이전, 전처리를 위한 함수들
-# from konlpy.tag import Mecab
-import re
+from kobert_tokenizer import KoBERTTokenizer
+from torch.utils.data import Dataset, DataLoader
 
-# mecab = Mecab()
+tokenizer = KoBERTTokenizer.from_pretrained('skt/kobert-base-v1')
 
+# Inference용 DataLoader 정의
+class inferenceDataset(Dataset):
+    def __init__(self, content, attention_masks):
+        self.content = content
+        self.attention_masks = attention_masks
+        self.num_classes = 2 # 훈련 데이터셋에 라벨이 2 class 인 관계로, 우선 2 class 로 설정 (코드 수정 시, 위 토크나이저 임포트 코드와 함께 바꿔주기)
 
-# def mecab_tokenize(text):
-#     """
-#     Mecab을 사용하여 tokenized text 반환
-#     """
-#     return " ".join(mecab.morphs(text))
+    def __len__(self):
+        return len(self.content)
 
+    def __getitem__(self, idx):
+        return {
+            'content': self.content[idx],
+            'attention_mask': self.attention_masks[idx]
+        }
 
-def clean_etc_reg_ex(title):
-    """
-    정규식을 통해 기타 공백과 기호, 숫자등을 제거
-    """
-    title = re.sub(
-        r"[@%\\*=()/~#&\+á?\xc3\xa1\-\|\.\:\;\!\-\,\_\~\$\'\"]", "", title
-    )  # remove punctuation
-    title = re.sub(r"[∼%①②⑤⑪…→·]", "", title)
-    title = re.sub(r"\d+", "", title)  # remove number
-    title = re.sub(r"\s+", " ", title)  # remove extra space
-    title = re.sub(r"<[^>]+>", "", title)  # remove Html tags
-    title = re.sub(r"\s+", " ", title)  # remove spaces
-    title = re.sub(r"^\s+", "", title)  # remove space from start
-    title = re.sub(r"\s+$", "", title)  # remove space from the end
-    title = re.sub("[一-龥]", "", title)
-    return title
+# Inference 용 전처리 함수
+def cls_inference_preprocess(sample):
+    text = f"First Major is {sample['firstMajor']}, Apply Grade is {sample['applyGrade']}, Apply Major is {sample['applyMajor']}, Apply Semester is {sample['applySemester']}, GPA is {sample['applyGPA']}"
 
+    preprocessed = "[CLS] " + text + " [SEP]"
 
-def slice_from_behind(text, num_of_chars):
-    return text[-num_of_chars:]
+    return preprocessed
 
-def preprocess(text):
-    text = clean_etc_reg_ex(text)
-    # text = mecab_tokenize(text)
-    return slice_from_behind(text, num_of_chars=500)
+# 토크나이징
+def tokenize(processed_str):
+    inference_tokenized_data = tokenizer.batch_encode_plus(
+        processed_str, # lyrics (수정)
+        add_special_tokens=True,
+        padding='longest',
+        truncation=True,
+        max_length=256, # 수정
+        return_attention_mask=True,
+        return_tensors='pt'
+    )
+
+    return inference_tokenized_data
+
+def get_dataloader(inference_tokenized_data):
+    inference_dataset = inferenceDataset(
+        content=inference_tokenized_data['input_ids'],
+        attention_masks=inference_tokenized_data['attention_mask'],
+    )
+
+    batch_size = 1
+    inference_dataloader = DataLoader(inference_dataset, batch_size= batch_size, shuffle=False)
+
+    return inference_dataloader
