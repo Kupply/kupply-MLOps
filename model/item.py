@@ -10,4 +10,4 @@ class DataInput(BaseModel):
     applyGPA: float = Field(ge=0, le=4.5) # 0 ~ 4.5
 
 class PredictOutput(BaseModel):
-    result: int # 1이면 합격, 0이면 불합격 -> 지금은 2개의 클래스로 
+    result: int # 1이면 합격, 0이면 불합격 > 지금은 2개의 클래스로 분류
