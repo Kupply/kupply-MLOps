@@ -14,13 +14,12 @@ def read_root():
 
 @app.post("/predict", response_model=PredictOutput)
 async def classify_blog_text(item_list: DataInput):
-    item_dict = DataInput(**item_list).dict()
+    item_dict = {'firstMajor': item_list.firstMajor, 'applyGrade': item_list.applyGrade, 'applyMajor': item_list.applyMajor, 'applySemester': item_list.applySemester, 'applyGPA': item_list.applyGPA}
     df = pd.DataFrame([item_dict])
-    print(df)
     processed_str = cls_inference_preprocess(df)
     inference_tokenized_data = tokenize(processed_str)
     inference_dataloader = get_dataloader(inference_tokenized_data)
 
-    prediction = classifier(inference_dataloader)
+    prediction = classifier(Config(model_path='./trained_model/kupply_epoch_49.pth'), inference_dataloader)
 
-    return prediction
+    return {"result": prediction}

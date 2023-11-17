@@ -18,7 +18,7 @@ def classifier(config, dataLoader) -> int:
     # Declare model and load pre-trained weights
     tokenizer = KoBERTTokenizer.from_pretrained('skt/kobert-base-v1')
     model = BertForSequenceClassification.from_pretrained('skt/kobert-base-v1',num_labels=2)
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     
     # Set the model to evaluation mode
     model.eval()  
