@@ -19,8 +19,6 @@ async def classify_blog_text(item_list: DataInput):
     inference_tokenized_data = tokenize(processed_str)
     inference_dataloader = get_dataloader(inference_tokenized_data)
 
-    
+    prediction = classifier(inference_dataloader)
 
-    result = classifier(inference_dataloader)
-
-    return result
+    return prediction
