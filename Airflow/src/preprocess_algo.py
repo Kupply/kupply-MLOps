@@ -1,12 +1,14 @@
 """
 [ 수정 필요 사항 ] 
 1. kobert_tokenizer S3 에 업로드 후 로드 (oth. 로컬에서 로드)
+2. 일부 함수에서 dataset csv 파일 임포트 필요
+3. train 코드 상에서 batch size 복원
 """
 
 from kobert_tokenizer import KoBERTTokenizer
 import torch
 from torch.utils.data import Dataset, DataLoader
-
+from airflow.models import TaskInstance # 오류 시 수정 필요
 
 # Train 용 DataLoader 정의
 class trainDataset(Dataset):
@@ -37,18 +39,30 @@ def get_tokenizer():
     tokenizer = KoBERTTokenizer.from_pretrained('skt/kobert-base-v1')
     return tokenizer
 
-
-def preprocess_dataset(sample):
+# No dependency 
+def preprocess_dataset(**kwargs):
+    sample = # 데이터셋 임포트 필요
     preprocessed = []
     for _, row in sample.iterrows():
         text = f"First Major is {row['firstMajor']}, Apply Grade is {row['applyGrade']}, Apply Major is {row['applyMajor']}, Apply Semester is {row['applySemester']}, GPA is {row['applyGPA']}, Pass is {row['pass']}"
         preprocessed_text = "[CLS] " + text + " [SEP]"
         preprocessed.append(preprocessed_text)
-    return preprocessed
+    
+    task_instance = kwargs['ti']
+    task_instance.xcom_push(key='preprocessed_data', value=preprocessed)
+    # return preprocessed
 
 
-def tokenize_dataset(sample):
-    tokenizer = get_tokenizer
+def tokenize_dataset(**kwargs):
+    tokenizer = get_tokenizer()
+    
+    task_instance = kwargs['ti']
+    sample = task_instance.xcom_pull(task_ids='preprocessed_data')
+    
+    # Checking if data is available
+    if sample is None:
+        raise ValueError("No data received from 'preprocessed_data' task")
+    
     tokenized_data = tokenizer.batch_encode_plus(
         sample,
         add_special_tokens=True,
@@ -58,42 +72,69 @@ def tokenize_dataset(sample):
         return_attention_mask=True,
         return_tensors='pt'
     )
-    return tokenized_data
+    task_instance.xcom_push(key='tokenized_data', value=tokenized_data)
+    # return tokenized_data
 
-
-def get_labels(sample):
+# No dependency 
+def get_labels():
+    sample = # 데이터셋 임포트 필요
     # df = # raw_data (DB 혹은 CSV 파일)
     labels = list(map(int, sample['pass'].tolist()))
     print(labels)
     return labels
 
 
-def split_dataset(sample, ratio):
+def split_dataset(**kwargs):
     # dataset = # raw_data
-    # ratio = # ratio
+    
+    task_instance = kwargs['ti']
+    sample = task_instance.xcom_pull(task_ids='fin_dataset')
+    
+    ratio = 0.8 # 임의 설정
     train_size = int(ratio * len(sample))
     val_size = len(sample) - train_size
+    
     train_dataset, val_dataset = torch.utils.data.random_split(
         sample, [train_size, val_size])
-    return train_dataset, val_dataset
+    
+    task_instance.xcom_push(key='split_dataset', value=[train_dataset, val_dataset])
+    # return train_dataset, val_dataset
 
 
-def get_train_dataset(sample):
+def get_train_dataset(**kwargs):
     labels = get_labels()
-    train_dataset = trainDataset(
+    
+    task_instance = kwargs['ti']
+    sample = task_instance.xcom_pull(task_ids='tokenized_data')
+    
+    # Checking if data is available
+    if sample is None:
+        raise ValueError("No data received from 'preprocessed_data' task")
+    
+    fin_dataset = trainDataset(
         content=sample['input_ids'],
         labels=labels,
         attention_masks=sample['attention_mask'],
     )
-    return train_dataset
+    task_instance.xcom_push(key='fin_dataset', value=fin_dataset)
+    # return fin_dataset
 
 
-def get_dataloader(sample):
-    train_dataset, val_dataset = split_dataset(sample, 0.8)
+def get_dataloader(**kwargs):
+    
+    task_instance = kwargs['ti']
+    sample = task_instance.xcom_pull(task_ids='split_dataset')
+    
+    train_dataset = sample[0]
+    val_dataset = sample[1]
+    
     batch_size = 8
     train_dataloader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True)
     # val 데이터셋은 shuffle 하면 안된다.
     val_dataloader = DataLoader(
         val_dataset, batch_size=batch_size, shuffle=False)
-    return train_dataloader, val_dataloader
+    
+    task_instance.xcom_push(key='train_dataloader', value=train_dataloader)
+    task_instance.xcom_push(key='val_dataloader', value=val_dataloader)
+    # return train_dataloader, val_dataloader

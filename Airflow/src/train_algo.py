@@ -19,6 +19,9 @@ from torch import nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+# 오류 시 삭제
+from airflow.models import TaskInstance
+
 
 def get_model_config():
     model_path = 'skt/kobert-base-v1'
@@ -27,7 +30,7 @@ def get_model_config():
 
 
 def get_model():
-    model_path, num_labels = get_model_config
+    model_path, num_labels = get_model_config()
     model = BertForSequenceClassification.from_pretrained(
         model_path, num_labels=num_labels)
     return model
@@ -44,14 +47,19 @@ def get_train_config():
 
 
 def get_optimizer():
-    model = get_model
+    model = get_model()
     _, lr, _, _, _ = get_train_config
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     return optimizer
 
 
-def get_scheduler_config(train_dataloader):
-    epochs, _, _, _, _ = get_train_config
+def get_scheduler_config(**kwargs):  # 보호관찰 필요
+
+    task_instance = kwargs['ti']
+    train_dataloader = task_instance.xcom_pull(task_ids='train_dataloader')
+    # train_dataloader
+
+    epochs, _, _, _, _ = get_train_config()
     warmup_ratio = 0.1
     data_len = len(train_dataloader)
     num_train_steps = int(data_len / epochs)
@@ -60,8 +68,8 @@ def get_scheduler_config(train_dataloader):
 
 
 def get_scheduler():
-    num_train_steps, num_warmup_steps = get_scheduler_config
-    optimizer = get_optimizer
+    num_train_steps, num_warmup_steps = get_scheduler_config()
+    optimizer = get_optimizer()
     scheduler = get_cosine_schedule_with_warmup(
         optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_train_steps)
     return scheduler
@@ -69,16 +77,20 @@ def get_scheduler():
 # Train 함수 정의
 
 
-def model_train(train_dataloader):
+def model_train(**kwargs):  # 보호관찰 필요
+
+    task_instance = kwargs['ti']
+    train_dataloader = task_instance.xcom_pull(task_ids='train_dataloader')
+    # train_dataloader
 
     # model config
-    model = get_model
-    optimizer = get_optimizer
-    scheduler = get_optimizer
+    model = get_model()
+    optimizer = get_optimizer()
+    scheduler = get_optimizer()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # train config
-    epochs, lr, grad_clip, train_log_interval, save_interval = get_train_config
+    epochs, lr, grad_clip, train_log_interval, save_interval = get_train_config()
 
     # 모델 학습을 설정된 device (CPU, cuda) 위에서 진행하도록 설정
     model.to(device)
@@ -141,7 +153,7 @@ def model_train(train_dataloader):
         # 각 epoch 마다 모델 저장
         state_dict = model.state_dict()
         model_path = os.path.join(
-            './', f"kupply_epoch_{epoch_id}.pth")
+            './', f"kupply_epoch_{epoch_id}.pth")  # 경로 보호관찰 필요
         # logger.info(f"global_step: {global_step} model saved at {model_path}")
         torch.save(state_dict, model_path)
 
