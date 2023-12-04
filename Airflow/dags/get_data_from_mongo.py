@@ -2,6 +2,13 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from pymongo import MongoClient
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+import os
+
+# load .env
+load_dotenv()
+
+DBUrl=os.environ.get('DBUrl')
 
 default_args = {
     'owner': 'airflow',
@@ -19,7 +26,7 @@ dag = DAG(
 )
 
 def get_data_from_mongo_atlas(ti):
-    client = MongoClient('mongodb+srv://bruce1115:b3848948389!!@cluster0.c3fiz0r.mongodb.net/?retryWrites=true&w=majority')
+    client = MongoClient(DBUrl)
 
     # Specify the database and collection
     db = client['test']  # Replace with your actual database name
