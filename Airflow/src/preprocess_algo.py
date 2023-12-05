@@ -1,13 +1,13 @@
 """
 [ 수정 필요 사항 ] 
 1. kobert_tokenizer S3 에 업로드 후 로드 (oth. 로컬에서 로드)
-2. 일부 함수에서 dataset csv 파일 임포트 필요
-3. train 코드 상에서 batch size 복원
+2. train 코드 상에서 batch size 복원
 """
 
 from kobert_tokenizer import KoBERTTokenizer
 import torch
 from torch.utils.data import Dataset, DataLoader
+import pandas as pd
 from airflow.models import TaskInstance # 오류 시 수정 필요
 
 # Train 용 DataLoader 정의
@@ -41,7 +41,7 @@ def get_tokenizer():
 
 # No dependency 
 def preprocess_dataset(**kwargs):
-    sample = # 데이터셋 임포트 필요
+    sample = pd.read_csv('../data/train_data.csv', index_col=0) # 데이터셋 삽입
     preprocessed = []
     for _, row in sample.iterrows():
         text = f"First Major is {row['firstMajor']}, Apply Grade is {row['applyGrade']}, Apply Major is {row['applyMajor']}, Apply Semester is {row['applySemester']}, GPA is {row['applyGPA']}, Pass is {row['pass']}"
@@ -77,7 +77,7 @@ def tokenize_dataset(**kwargs):
 
 # No dependency 
 def get_labels():
-    sample = # 데이터셋 임포트 필요
+    sample = pd.read_csv('../data/train_data.csv', index_col=0)  # 데이터셋 삽입
     # df = # raw_data (DB 혹은 CSV 파일)
     labels = list(map(int, sample['pass'].tolist()))
     print(labels)
