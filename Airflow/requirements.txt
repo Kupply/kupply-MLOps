@@ -1,3 +1,7 @@
 pandas
 numpy
-tensorflow
+torch
+transformers
+tqdm
+sentencepiece
+pymongo

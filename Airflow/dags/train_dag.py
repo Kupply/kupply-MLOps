@@ -1,5 +1,5 @@
 import os
-import pendulum  # Python datetime module 조작 목적
+# import pendulum  # Python datetime module 조작 목적
 from datetime import timedelta
 
 ###
@@ -12,7 +12,7 @@ from os import path
 from datetime import datetime
 
 
-from FastAPI.kobert_tokenizer.kobert_tokenizer import KoBERTTokenizer
+from kobert_tokenizer.kobert_tokenizer import KoBERTTokenizer
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 from tqdm import tqdm
 import sentencepiece
@@ -22,7 +22,6 @@ from torch import nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-import gluonnlp as nlp
 import numpy as np
 from tqdm.notebook import tqdm
 

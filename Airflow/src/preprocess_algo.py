@@ -1,4 +1,4 @@
-from FastAPI.kobert_tokenizer.kobert_tokenizer import KoBERTTokenizer
+from kobert_tokenizer.kobert_tokenizer import KoBERTTokenizer
 import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd

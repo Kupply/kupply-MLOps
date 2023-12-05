@@ -5,7 +5,7 @@ import math
 import os
 
 from os import path
-from transformers import BertForSequenceClassification, AdamW
+from transformers import BertForSequenceClassification
 
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 from tqdm import tqdm
@@ -134,7 +134,8 @@ def model_train(**kwargs):
 
         # 콘솔 출력
         print(f"EP:{epoch_id} global_step:{global_step} ")
-        print(f"loss:{mean_loss:.4f} perplexity:{math.exp(mean_loss):.4f}")
+        print(f"loss:{mean_loss:.4f}) 
+        # perplexity:{math.exp(mean_loss):.4f}")
 
         # logger.info(
         #     f"EP:{epoch_id} global_step:{global_step} "
