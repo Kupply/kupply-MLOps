@@ -1,1 +1,1 @@
-from .kobert_tokenizer import KoBERTTokenizer 
+# from .kobert_tokenizer import KoBERTTokenizer

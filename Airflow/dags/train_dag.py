@@ -1,43 +1,12 @@
 import os
-# import pendulum  # Python datetime module 조작 목적
 from datetime import timedelta
-
-###
-import pandas as pd
-import numpy as np
-import math
-from torch.utils.data import Dataset, DataLoader
-from transformers import BertTokenizer, BertForSequenceClassification, AdamW
-from os import path
-from datetime import datetime
-
-
-from kobert_tokenizer.kobert_tokenizer import KoBERTTokenizer
-from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
-from tqdm import tqdm
-import sentencepiece
-
-import torch
-from torch import nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
-from tqdm.notebook import tqdm
-
-###
+import pendulum  # Python datetime module 조작 목적
 
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import PythonOperator, BranchPythonOperator, ShortCircuitOperator
+from airflow.operators.python import PythonOperator
 
-
-from src.preprocess_algo import trainDataset  # 클래스 import
 from src.preprocess_algo import get_tokenizer, preprocess_dataset, tokenize_dataset, get_labels, split_dataset, get_train_dataset, get_dataloader  # 함수 import
 from src.train_algo import get_model_config, get_model, get_train_config, get_optimizer, get_scheduler_config, get_scheduler, model_train
-
-
-#######################################################
 
 
 seoul_time = pendulum.timezone('Asia/Seoul')
@@ -47,8 +16,9 @@ dag_name = os.path.basename(__file__).split('.')[0]
 default_args = {
     'owner': 'kupply',
     'retries': 3,
-    'retry_delay': timedelta(minutes=1)
-    # 실패 시 1분 간격으로 retry (추후 수정 필요)
+    'retry_delay': timedelta(minutes=1),
+    'execution_timeout': timedelta(seconds=60),
+    'timeout': 3600,
 }
 
 # 단순 복붙 상태

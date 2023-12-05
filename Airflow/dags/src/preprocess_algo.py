@@ -1,10 +1,11 @@
-from kobert_tokenizer.kobert_tokenizer import KoBERTTokenizer
+# from kobert_tokenizer.kobert_tokenizer import KoBERTTokenizer
 import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from airflow.models import TaskInstance
 
-# Train 용 DataLoader 정의
+# Airflow tokenizer folder 인식 불가 이슈 해결 목적 임시 라이브러리 임포트
+from transformers import AutoTokenizer
 
 
 class trainDataset(Dataset):
@@ -32,7 +33,8 @@ class trainDataset(Dataset):
 
 
 def get_tokenizer():
-    tokenizer = KoBERTTokenizer.from_pretrained('skt/kobert-base-v1')
+    # tokenizer = KoBERTTokenizer.from_pretrained('skt/kobert-base-v1')
+    tokenizer = AutoTokenizer.from_pretrained('bert-base-cased')
     return tokenizer
 
 # No dependency
