@@ -1,8 +1,3 @@
-"""
-[ 수정 필요 사항 ] 
-1. 체크포인트 저장 경로 S3 로 수정 필요
-"""
-
 import pandas as pd
 import numpy as np
 import torch
@@ -10,7 +5,7 @@ import math
 import os
 
 from os import path
-from transformers import BertTokenizer, BertForSequenceClassification, AdamW
+from transformers import BertForSequenceClassification, AdamW
 
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 from tqdm import tqdm
@@ -43,12 +38,13 @@ def get_train_config():
     train_log_interval = 30
     # validation_interval = 1000
     save_interval = 60
-    return epochs, lr, grad_clip, train_log_interval, save_interval  # 총 5가지
+    batch_size = 8
+    return epochs, lr, grad_clip, train_log_interval, save_interval, batch_size  # 총 6가지
 
 
 def get_optimizer():
     model = get_model()
-    _, lr, _, _, _ = get_train_config
+    _, lr, _, _, _, batch_size = get_train_config()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     return optimizer
 
@@ -59,10 +55,10 @@ def get_scheduler_config(**kwargs):  # 보호관찰 필요
     train_dataloader = task_instance.xcom_pull(task_ids='train_dataloader')
     # train_dataloader
 
-    epochs, _, _, _, _ = get_train_config()
+    epochs, _, _, _, _, batch_size = get_train_config()
     warmup_ratio = 0.1
     data_len = len(train_dataloader)
-    num_train_steps = int(data_len / epochs)
+    num_train_steps = int(data_len / batch_size * epochs)
     num_warmup_steps = int(num_train_steps * warmup_ratio)
     return num_train_steps, num_warmup_steps
 
@@ -77,7 +73,7 @@ def get_scheduler():
 # Train 함수 정의
 
 
-def model_train(**kwargs):  # 보호관찰 필요
+def model_train(**kwargs):
 
     task_instance = kwargs['ti']
     train_dataloader = task_instance.xcom_pull(task_ids='train_dataloader')
@@ -90,7 +86,7 @@ def model_train(**kwargs):  # 보호관찰 필요
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # train config
-    epochs, lr, grad_clip, train_log_interval, save_interval = get_train_config()
+    epochs, lr, grad_clip, train_log_interval, save_interval, batch_size = get_train_config()
 
     # 모델 학습을 설정된 device (CPU, cuda) 위에서 진행하도록 설정
     model.to(device)
@@ -153,7 +149,7 @@ def model_train(**kwargs):  # 보호관찰 필요
         # 각 epoch 마다 모델 저장
         state_dict = model.state_dict()
         model_path = os.path.join(
-            './', f"kupply_epoch_{epoch_id}.pth")  # 경로 보호관찰 필요
+            '../checkpoints/', f"kupply_epoch_{epoch_id}.pth")
         # logger.info(f"global_step: {global_step} model saved at {model_path}")
         torch.save(state_dict, model_path)
 

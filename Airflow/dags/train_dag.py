@@ -11,7 +11,8 @@ from transformers import BertTokenizer, BertForSequenceClassification, AdamW
 from os import path
 from datetime import datetime
 
-from kobert_tokenizer import KoBERTTokenizer
+
+from FastAPI.kobert_tokenizer.kobert_tokenizer import KoBERTTokenizer
 from transformers.optimization import AdamW, get_cosine_schedule_with_warmup
 from tqdm import tqdm
 import sentencepiece
