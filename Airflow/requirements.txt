@@ -4,5 +4,5 @@ torch
 transformers
 tqdm
 sentencepiece
-pymongo
-bson
+apache-airflow-providers-mongo
+apache-airflow-providers-amazon
