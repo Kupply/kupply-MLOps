@@ -1,90 +1,91 @@
+import pendulum
+import pandas as pd
 from airflow import DAG
+from airflow.decorators import task
 from airflow.operators.python import PythonOperator
-from pymongo import MongoClient
+from airflow.providers.mongo.hooks.mongo import MongoHook
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
-import os
 
-# load .env
-load_dotenv()
-
-DBUrl=os.environ.get('DBUrl')
+local_tz = pendulum.timezone("Asia/Seoul")
 
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2023, 12, 5),
+    'start_date': datetime(2023, 4, 1, tzinfo=local_tz),
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
+    'execution_timeout': timedelta(seconds=60),
 }
 
-dag = DAG(
-    'mongo_dag',
+def upload_to_s3(ti):
+    application_df = ti.xcom_pull(task_ids='get_application_data')
+    date = datetime.now().strftime("%Y%m%d")
+    application_df.to_csv(f'{date}_applications.csv', index=False)
+
+    hook = S3Hook('aws_default')
+    filename = f'{date}_applications.csv'
+    key = f'applications/{date}_applications.csv'
+    bucket_name = 'kupply-bucket'
+    hook.load_file(filename=filename, key=key, bucket_name=bucket_name, replace=True)
+
+
+with DAG(
+    dag_id='mongo_to_s3_dag',
     default_args=default_args,
-    description='A simple Airflow DAG to read data from MongoDB using pymongo',
-    schedule_interval=timedelta(days=1),
-)
+    description='Read data from MongoDB and upload to S3',
+    schedule_interval="0 0 1 3,9 *", # 매년 3월 1일, 9월 1일 새벽 12시에 실행 => 새 학기마다
+    tags=['kupply', 'load_data'],
+    catchup=False,
+) as dag:
 
-def get_data_from_mongo_atlas(ti):
-    client = MongoClient(DBUrl)
+    @task()
+    def get_application_data():
+        hook = MongoHook(mongo_conn_id="mongo_conn")
+        client = hook.get_conn()
+        db = (
+            client.test
+        )
 
-    # Specify the database and collection
-    db = client['test']  # Replace with your actual database name
-    collection = db['users']  # Replace with your actual collection name
-    
-    query = {'role': 'passer'}
-    result = collection.find(query)
-    
-    ti.xcom_push(key="passers", value=result)
+        users = db.users
+        applications = db.applications
+        majors = db.majors
 
-    for document in result:
-        print(document)
+        print(f"Connected to MongoDB - {client.server_info()}")
 
-    # Close the MongoDB connection
-    client.close()
+        applications_result = applications.find({
+            "$or": [{"pnp": "PASS"}, {"pnp": "FAIL"}],
+            "candidateId": {"$ne": None}
+        }, { "_id": 0, "candidateId": 1, "applyGrade": 1, "applySemester": 1, "applyMajor1": 1, "applyGPA": 1, "pnp": 1 })
+        users_result = users.find({}, { "_id": 1, "firstMajor": 1 })
+        majors_result = majors.find()
 
-with dag:
-    task_read_mongo_data = PythonOperator(
-        task_id='read_mongo_data',
-        python_callable=get_data_from_mongo_atlas,
-        provide_context=True,
+        users_dict = {user["_id"]: user for user in users_result}
+        applications_dict = {app["candidateId"]: app for app in applications_result}
+        majors_dict = {major["_id"]: major["name"] for major in majors_result}
+
+        merged_data = []
+        for user_id, user_data in users_dict.items():
+            if user_id in applications_dict:
+                application_data = applications_dict[user_id]
+                application_data["pnp"] = 1 if application_data["pnp"] == "PASS" else 0
+                user_data["firstMajor"] = majors_dict.get(user_data["firstMajor"], "Unknown")
+                application_data["applyMajor1"] = majors_dict.get(application_data["applyMajor1"], "Unknown")
+                merged_data.append({**user_data, **application_data})
+
+        application_df = pd.DataFrame(merged_data)
+                
+        drop_list = ["_id", "candidateId"]
+        application_df.drop(labels=drop_list, axis=1, inplace=True)
+        application_df.rename(columns = {"pnp": "pass"}, inplace=True)
+
+        return application_df
+
+    upload_to_s3 = PythonOperator(
+        task_id='upload_to_s3',
+        python_callable=upload_to_s3,
     )
 
-task_read_mongo_data
+    get_application_data_task = get_application_data() 
 
-# def _get_url(ti):
-#     pathlib.Path("/home/airflow/data").mkdir(parents=True, exist_ok=True)
-#     TTBKey = 'Myapi_key'
-#     items = []
-#     for start_value in range(1, 11):
-#         url = f"http://www.aladin.co.kr/ttb/api/ItemList.aspx?ttbkey={TTBKey}&QueryType=ItemNewAll&SearchTarget=Used&SubSearchTarget=Book&MaxResults=50&start={start_value}&output=js&Version=20131101&OptResult=usedList"
-#         res = requests.get(url)
-#         items.extend(res.json()['item'])
-#     # items 리스트를 Airflow의 XCom 메커니즘을 통해 다른 작업과 공유 가능 이를 통해 items 값을 다른 작업에서 사용가능
-#     ti.xcom_push(key="items", value=items)
-    
-# def insert_data_to_mongo_atlas(ti):
-# 	# 이전 작업에서 XCom을 통해 전달된 데이터를 가져온다.
-#     data = ti.xcom_pull(key="items")
-#     # 자신의 MongoDB Atlas와 연결해준다. user와 password값 등록
-#     client = MongoClient('mongodb+srv://user:<password>@cluster0.wydppxv.mongodb.net/?retryWrites=true&w=majority')
-    
-#     db = client['etl']
-#     collection = db['aladin']
-#     for item in data:
-#         collection.insert_one(item)
-    
-
-# get_url = PythonOperator(
-#     task_id="get_url", python_callable=_get_url, dag=dag
-# )
-
-# insert_task = PythonOperator(
-#     task_id='insert_to_mongo_atlas',
-#     python_callable=insert_data_to_mongo_atlas,
-#     # 작업 함수에 실행 컨텍스트를 제공
-#     #  ti 매개변수를 통해 TaskInstance를 사용
-#     provide_context=True,
-#     dag=dag,
-# )
-# get_url >>  insert_task
+    get_application_data_task >> upload_to_s3
