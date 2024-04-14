@@ -14,9 +14,6 @@ from torch import nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-# 오류 시 삭제
-from airflow.models import TaskInstance
-
 
 def get_model_config():
     model_path = 'skt/kobert-base-v1'
@@ -42,30 +39,29 @@ def get_train_config():
     return epochs, lr, grad_clip, train_log_interval, save_interval, batch_size  # 총 6가지
 
 
-def get_optimizer():
+def get_optimizer(ti):
     model = get_model()
-    _, lr, _, _, _, batch_size = get_train_config()
+    _, lr, _, _, _, batch_size = ti.xcom_pull(task_ids='get_train_config_task')
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     return optimizer
 
 
-def get_scheduler_config(**kwargs):  # 보호관찰 필요
+def get_scheduler_config(ti):  # 보호관찰 필요=
+    dataloader = ti.xcom_pull(task_ids='get_dataloader_task')
+    train_dataloader = dataloader[0]
 
-    task_instance = kwargs['ti']
-    train_dataloader = task_instance.xcom_pull(task_ids='train_dataloader')
-    # train_dataloader
-
-    epochs, _, _, _, _, batch_size = get_train_config()
+    epochs, _, _, _, _, batch_size = ti.xcom_pull(task_ids='get_train_config_task')
     warmup_ratio = 0.1
     data_len = len(train_dataloader)
     num_train_steps = int(data_len / batch_size * epochs)
     num_warmup_steps = int(num_train_steps * warmup_ratio)
+
     return num_train_steps, num_warmup_steps
 
 
-def get_scheduler():
-    num_train_steps, num_warmup_steps = get_scheduler_config()
-    optimizer = get_optimizer()
+def get_scheduler(ti):
+    num_train_steps, num_warmup_steps = ti.xcom_pull(task_ids='get_scheduler_config_task')
+    optimizer = ti.xcom_pull(task_ids='get_optimizer_task')
     scheduler = get_cosine_schedule_with_warmup(
         optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_train_steps)
     return scheduler
@@ -73,20 +69,18 @@ def get_scheduler():
 # Train 함수 정의
 
 
-def model_train(**kwargs):
-
-    task_instance = kwargs['ti']
-    train_dataloader = task_instance.xcom_pull(task_ids='train_dataloader')
-    # train_dataloader
+def model_train(ti):
+    dataloader = ti.xcom_pull(task_ids='get_dataloader_task')
+    train_dataloader = dataloader[0]
 
     # model config
     model = get_model()
-    optimizer = get_optimizer()
-    scheduler = get_optimizer()
+    optimizer = ti.xcom_pull(task_ids='get_optimizer_task')
+    scheduler = ti.xcom_pull(task_ids='get_scheduler_task')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # train config
-    epochs, lr, grad_clip, train_log_interval, save_interval, batch_size = get_train_config()
+    epochs, lr, grad_clip, train_log_interval, save_interval, batch_size = ti.xcom_pull(task_ids='get_train_config_task')
 
     # 모델 학습을 설정된 device (CPU, cuda) 위에서 진행하도록 설정
     model.to(device)

@@ -1,24 +1,25 @@
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 import pendulum  # Python datetime module 조작 목적
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-from src.preprocess_algo import get_tokenizer, preprocess_dataset, tokenize_dataset, get_labels, split_dataset, get_train_dataset, get_dataloader  # 함수 import
+from src.preprocess_algo import get_tokenizer, get_labels, preprocess_dataset, tokenize_dataset, get_data_from_s3, split_dataset, get_train_dataset, get_dataloader  # 함수 import
 from src.train_algo import get_model_config, get_model, get_train_config, get_optimizer, get_scheduler_config, get_scheduler, model_train
 
 
-seoul_time = pendulum.timezone('Asia/Seoul')
+local_tz = pendulum.timezone("Asia/Seoul")
 dag_name = os.path.basename(__file__).split('.')[0]
 # 'train_dag' 으로 저장
 
 default_args = {
-    'owner': 'kupply',
-    'retries': 3,
-    'retry_delay': timedelta(minutes=1),
-    'execution_timeout': timedelta(seconds=60),
-    'timeout': 3600,
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'start_date': datetime(2023, 4, 1, tzinfo=local_tz),
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+    'execution_timeout': timedelta(minutes=10),
 }
 
 # 단순 복붙 상태
@@ -26,22 +27,15 @@ with DAG(
     dag_id=dag_name,
     default_args=default_args,
     description='2023-2 DevKor MLOps 프로젝트',
-    schedule_interval='@once',  # timedelta(minutes=10),  # 수정 필요
-    start_date=pendulum.datetime(2023, 12, 1, tz=seoul_time),  # 수정 필요
-    catchup=False,  # 과거(= 과거 start_date)의 dag 실행 여부
+    schedule_interval=None,  # get_data_from_mongo에 의해 trigger된다.
+    catchup=False,
     tags=['kupply', 'classification']  # 필요 시 추가
 ) as dag:
-
-    get_model_task = PythonOperator(
-        task_id='get_model_task',
+    
+    get_data_from_s3_task = PythonOperator(
+        task_id='get_data_from_s3_task',
         provide_context=True,
-        python_callable=get_model,
-    )
-
-    get_tokenizer_task = PythonOperator(
-        task_id='get_tokenizer_task',
-        provide_context=True,
-        python_callable=get_tokenizer,
+        python_callable=get_data_from_s3,  # 함수에 인자(sample) 필요
     )
 
     get_labels_task = PythonOperator(
@@ -110,8 +104,8 @@ with DAG(
         python_callable=model_train,  # 함수에 인자(train_dataloader) 필요
     )
 
-    # 실행 순서대로 나열
-    get_model_task >> get_tokenizer_task >> get_labels_task >> preprocess_dataset_task >> tokenize_dataset_task >> get_train_dataset_task >> split_dataset_task >> get_dataloader_task >> get_train_config_task >> get_optimizer_task >> get_scheduler_config_task >> get_scheduler_task >> model_train_task
+    get_data_from_s3_task >> get_labels_task >> preprocess_dataset_task >> tokenize_dataset_task >> get_train_dataset_task >> split_dataset_task >> get_dataloader_task 
+    get_dataloader_task >> get_train_config_task >> get_optimizer_task >> get_scheduler_config_task >> get_scheduler_task >> model_train_task
 
     """
     [ XCom 설명 ]
