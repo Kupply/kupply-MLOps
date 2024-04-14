@@ -3,6 +3,7 @@ import pandas as pd
 from airflow import DAG
 from airflow.decorators import task
 from airflow.operators.python import PythonOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.mongo.hooks.mongo import MongoHook
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from datetime import datetime, timedelta
@@ -10,7 +11,7 @@ from datetime import datetime, timedelta
 local_tz = pendulum.timezone("Asia/Seoul")
 
 default_args = {
-    'owner': 'airflow',
+    'owner': 'kupply',
     'depends_on_past': False,
     'start_date': datetime(2023, 4, 1, tzinfo=local_tz),
     'retries': 1,
@@ -77,7 +78,7 @@ with DAG(
                 
         drop_list = ["_id", "candidateId"]
         application_df.drop(labels=drop_list, axis=1, inplace=True)
-        application_df.rename(columns = {"pnp": "pass"}, inplace=True)
+        application_df.rename(columns = {"pnp": "pass", "applyMajor1": "applyMajor"}, inplace=True)
 
         return application_df
 
@@ -86,6 +87,13 @@ with DAG(
         python_callable=upload_to_s3,
     )
 
+    trigger_train_dag = TriggerDagRunOperator(
+        task_id='trigger_train_dag',
+        trigger_dag_id='train_dag',
+        reset_dag_run=False,
+        wait_for_completion=False,
+    )
+
     get_application_data_task = get_application_data() 
 
-    get_application_data_task >> upload_to_s3
+    get_application_data_task >> upload_to_s3 >> trigger_train_dag
