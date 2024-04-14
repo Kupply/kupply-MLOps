@@ -11,13 +11,12 @@ import sentencepiece
 # from transformers import BertForSequenceClassification, AlbertForSequenceClassification
 
 def classifier(config, dataLoader) -> int:
-    
     # Load config_info
-    model_path = config.model_path
+    model_path = config.get_model_path()
     
     # Declare model and load pre-trained weights
     tokenizer = KoBERTTokenizer.from_pretrained('skt/kobert-base-v1')
-    model = BertForSequenceClassification.from_pretrained('skt/kobert-base-v1',num_labels=2)
+    model = BertForSequenceClassification.from_pretrained('skt/kobert-base-v1', num_labels=2)
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     
     # Set the model to evaluation mode
