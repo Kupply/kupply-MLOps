@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 import boto3
 
 class Config():
@@ -19,3 +20,10 @@ class Config():
 
     def get_model_path(self):
         return self.model_path
+
+# 서버 시작 시, 모델이 없을 때 다운로드
+load_dotenv()
+aws_bucket_name = os.getenv('AWS_BUCKET_NAME')
+aws_key = 'models/kupply_epoch_49.pth'
+config = Config(aws_bucket_name, aws_key)
+model_path = config.get_model_path()

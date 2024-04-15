@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from typing import List
 import pandas as pd
@@ -9,6 +10,7 @@ from preprocessor import cls_inference_preprocess, tokenize, get_dataloader
 
 app = FastAPI()
 
+load_dotenv()
 AWS_BUCKET_NAME=os.getenv('AWS_BUCKET_NAME')
 
 @app.get("/")
