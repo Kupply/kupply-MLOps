@@ -8,7 +8,7 @@ from classifier import classifier
 from model.item import DataInput, PredictOutput
 from preprocessor import cls_inference_preprocess, tokenize, get_dataloader
 
-app = FastAPI()
+app = FastAPI(swagger_ui_parameters={"displayRequestDuration": True})
 
 load_dotenv()
 AWS_BUCKET_NAME=os.getenv('AWS_BUCKET_NAME')
