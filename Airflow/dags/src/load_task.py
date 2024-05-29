@@ -56,7 +56,7 @@ def get_application_data():
     return application_df
     
 def upload_to_s3(ti):
-    application_df = ti.xcom_pull(task_ids='get_application_data')
+    application_df = ti.xcom_pull(task_ids='get_application_data_task')
     current_semester = get_current_semester()
     application_df.to_csv(f'{current_semester}_applications.csv', index=False)
 
