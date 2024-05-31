@@ -10,9 +10,9 @@ def get_current_semester():
     month = now.month
 
     if month <= 8:
-        return f"{year}-1"
+        return f"{year}_1"
     else:
-        return f"{year}-2"
+        return f"{year}_2"
     
 def get_application_data():
     hook = MongoHook(mongo_conn_id="mongo_conn")
