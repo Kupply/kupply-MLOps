@@ -10,9 +10,9 @@ def get_current_semester():
     month = now.month
 
     if month <= 8:
-        return f"{year}-1"
+        return f"{year}_1"
     else:
-        return f"{year}-2"
+        return f"{year}_2"
     
 def get_application_data():
     hook = MongoHook(mongo_conn_id="mongo_conn")
@@ -56,7 +56,7 @@ def get_application_data():
     return application_df
     
 def upload_to_s3(ti):
-    application_df = ti.xcom_pull(task_ids='get_application_data')
+    application_df = ti.xcom_pull(task_ids='get_application_data_task')
     current_semester = get_current_semester()
     application_df.to_csv(f'{current_semester}_applications.csv', index=False)
 

@@ -28,22 +28,21 @@ with DAG(
     catchup=False,
 ) as dag:
     
-    get_application_data = PythonOperator(
-        task_id='get_application_data',
+    get_application_data_task = PythonOperator(
+        task_id='get_application_data_task',
         python_callable=get_application_data,
     )
     
-    upload_to_s3 = PythonOperator(
-        task_id='upload_to_s3',
+    upload_to_s3_task = PythonOperator(
+        task_id='upload_to_s3_task',
         python_callable=upload_to_s3,
     )
 
-    trigger_train_dag = TriggerDagRunOperator(
-        task_id='trigger_train_dag',
-        trigger_dag_id='train_dag',
+    trigger_train_model_dag_task = TriggerDagRunOperator(
+        task_id='trigger_train_model_dag_task',
+        trigger_dag_id='train_model_dag',
         reset_dag_run=False,
         wait_for_completion=False,
     )
 
-
-    get_application_data >> upload_to_s3 >> trigger_train_dag
+    get_application_data_task >> upload_to_s3_task >> trigger_train_model_dag_task
