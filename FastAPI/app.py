@@ -1,30 +1,47 @@
 import os
-from dotenv import load_dotenv
-from fastapi import FastAPI
-from typing import List
+from datetime import datetime
+
 import pandas as pd
-from config import Config
-from classifier import classifier
+from fastapi import FastAPI
+from dotenv import load_dotenv
+from pycaret.classification import load_model, predict_model
+
 from model.item import DataInput, PredictOutput
-from preprocessor import cls_inference_preprocess, tokenize, get_dataloader
 
 app = FastAPI(swagger_ui_parameters={"displayRequestDuration": True})
 
 load_dotenv()
 AWS_BUCKET_NAME=os.getenv('AWS_BUCKET_NAME')
 
+def get_current_semester():
+    now = datetime.now()
+    year = now.year
+    month = now.month
+
+    if month <= 8:
+        return f"{year}_1"
+    else:
+        return f"{year}_2"
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
-@app.post("/predict", response_model=PredictOutput)
+@app.post("/prediction", response_model=PredictOutput)
 async def inference(item_list: DataInput):
-    item_dict = {'firstMajor': item_list.firstMajor, 'applyGrade': item_list.applyGrade, 'applyMajor': item_list.applyMajor, 'applySemester': item_list.applySemester, 'applyGPA': item_list.applyGPA}
+    item_dict = {'firstMajor': item_list.firstMajor, 
+                 'applyGrade': item_list.applyGrade, 
+                 'applyMajor': item_list.applyMajor, 
+                 'applySemester': item_list.applySemester, 
+                 'applyGPA': item_list.applyGPA}
     df = pd.DataFrame([item_dict])
-    processed_str = cls_inference_preprocess(df)
-    inference_tokenized_data = tokenize(processed_str)
-    inference_dataloader = get_dataloader(inference_tokenized_data)
 
-    prediction = classifier(Config(aws_bucket_name=AWS_BUCKET_NAME, aws_key='models/kupply_epoch_49.pth'), inference_dataloader)
+    current_semester = get_current_semester()
+    classification_model = load_model(model_name=f"{current_semester}_classification_model",
+                                      platform='aws', 
+                                      authentication={'bucket': AWS_BUCKET_NAME, 
+                                                      'path': "models/"})
+    prediction = predict_model(classification_model, data=df)
 
-    return {"result": prediction}
+    return {"prediction_label": prediction.iloc[0]['prediction_label'],
+            "prediction_score": prediction.iloc[0]['prediction_score']}
