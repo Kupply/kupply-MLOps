@@ -35,6 +35,8 @@ def train_model(ti):
 
     classification_best_model = compare_models()
 
+    print(f"Best Model: {classification_best_model}")
+
     classification_best_model_final = finalize_model(classification_best_model)
 
     # Save the model to a file
