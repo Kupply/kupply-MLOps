@@ -1,5 +1,7 @@
-import pandas as pd
 from datetime import datetime
+from collections import defaultdict
+
+import pandas as pd
 
 from airflow.providers.mongo.hooks.mongo import MongoHook
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
@@ -29,30 +31,41 @@ def get_application_data():
 
     applications_result = applications.find({
         "candidateId": {"$ne": None},
-        "applySemester": {"$ne": "2024-1"}
+        "pnp": {"$ne": "TBD"},
     }, { "_id": 0, "candidateId": 1, "applyGrade": 1, "applySemester": 1, "applyMajor1": 1, "applyGPA": 1, "pnp": 1 })
     users_result = users.find({}, { "_id": 1, "firstMajor": 1 })
     majors_result = majors.find()
 
     users_dict = {user["_id"]: user for user in users_result}
-    applications_dict = {app["candidateId"]: app for app in applications_result}
     majors_dict = {major["_id"]: major["name"] for major in majors_result}
+    
+    applications_dict = defaultdict(list)
+    for application in applications_result:
+        applications_dict[application["candidateId"]].append(application)
 
     merged_data = []
-    for user_id, user_data in users_dict.items():
-        if user_id in applications_dict:
-            application_data = applications_dict[user_id]
-            application_data["pnp"] = 1 if application_data["pnp"] == "PASS" else 0 # PASS: 1, FAIL or TBD: 0
-            user_data["firstMajor"] = majors_dict.get(user_data["firstMajor"], "Unknown")
-            application_data["applyMajor1"] = majors_dict.get(application_data["applyMajor1"], "Unknown")
-            merged_data.append({**user_data, **application_data})
+    for user_id, application_list in applications_dict.items():
+        user = users_dict.get(user_id)
+        if not user:
+            print(f"User with ID {user_id} not found in users collection.")
+            print(f"Application data: {application_list}")
+            continue
+
+        first_major = majors_dict.get(user["firstMajor"], "Unknown")
+
+        for application_data in application_list:
+            apply_major = majors_dict.get(application_data["applyMajor1"], "Unknown")
+            merged_data.append({
+                "firstMajor": first_major,
+                "applyGrade": application_data["applyGrade"],
+                "applySemester": application_data["applySemester"],
+                "applyMajor": apply_major,
+                "applyGPA": application_data["applyGPA"],
+                "pass": 1 if application_data["pnp"] == "PASS" else 0
+            })
 
     application_df = pd.DataFrame(merged_data)
-            
-    drop_list = ["_id", "candidateId"]
-    application_df.drop(labels=drop_list, axis=1, inplace=True)
-    application_df.rename(columns = {"pnp": "pass", "applyMajor1": "applyMajor"}, inplace=True)
-
+    
     return application_df
     
 def upload_to_s3(ti):
