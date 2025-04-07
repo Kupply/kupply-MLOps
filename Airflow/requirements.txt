@@ -1,9 +1,4 @@
 pandas
-numpy
-torch
-transformers
-tqdm
-sentencepiece
 apache-airflow-providers-mongo
 apache-airflow-providers-amazon
 pycaret
